@@ -1,0 +1,46 @@
+cameras:
+  - id: cam1
+    name: Boundary Camera 1
+    rtsp_url: rtsp://localhost:8554/cam1
+    location_type: boundary
+    enabled: true
+    zone:
+      polygon:
+        - [100, 100]
+        - [540, 100]
+        - [540, 380]
+        - [100, 380]
+    rules:
+      active_hours_start: "00:00"
+      active_hours_end: "23:59"
+      sensitivity: 0.4
+      suppressed_classes:
+        - dog
+        - cat
+        - bird
+        - horse
+        - cow
+        - sheep
+
+  - id: cam2
+    name: Central Store Camera
+    rtsp_url: rtsp://localhost:8554/cam2
+    location_type: central_store
+    enabled: true
+    zone:
+      polygon:
+        - [80, 60]
+        - [560, 60]
+        - [560, 400]
+        - [80, 400]
+    rules:
+      active_hours_start: "18:00"
+      active_hours_end: "08:00"
+      sensitivity: 0.4
+      suppressed_classes:
+        - dog
+        - cat
+        - bird
+        - horse
+        - cow
+        - sheep

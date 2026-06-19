@@ -80,15 +80,19 @@ Install the following before setup:
 # Clone
 git clone <repo-url> && cd pids-poc
 
-# Python environment
-python -m venv .venv
+# Python environment (using uv)
+uv venv --python 3.12 .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Verify imports
 python -c "import ultralytics, cv2, shapely, fastapi, motor"
+python -c "import torch; print(torch.__version__)"
 
-# Angular dashboard
+# Copy and edit environment config
+cp .env.example .env
+
+# Angular dashboard (Phase 6)
 cd dashboard
 npm install
 cd ..
