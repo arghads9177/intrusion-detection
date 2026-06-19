@@ -103,10 +103,28 @@ cd ..
 ### 1. Start RTSP streams
 
 ```bash
+# Generate synthetic sample videos (first time only)
+python sim/generate_samples.py
+
+# Start MediaMTX + ffmpeg loops
 ./sim/start_streams.sh
+
+# Verify streams are up (alternative to ffplay/VLC)
+python sim/verify_streams.py
+
+# Stop streams
+./sim/stop_streams.sh
 ```
 
 Launches MediaMTX and loops sample videos into `rtsp://localhost:8554/cam1` and `cam2`.
+The script auto-generates sample videos if none exist. Use `--generate` to force regeneration.
+
+| Stream | URL | Content |
+|--------|-----|---------|
+| cam1 | `rtsp://localhost:8554/cam1` | Person intrusion (boundary) |
+| cam2 | `rtsp://localhost:8554/cam2` | Animal motion (central store) |
+
+You can override video files via environment variables: `CAM1_FILE`, `CAM2_FILE`.
 
 ### 2. Start MongoDB
 

@@ -26,6 +26,11 @@ dashboard/dist/
 .vscode/
 .idea/
 
+# Simulation runtime
+sim/.pids/
+sim/*.log
+sim/samples/*.mp4
+
 # OS
 .DS_Store
 Thumbs.db
