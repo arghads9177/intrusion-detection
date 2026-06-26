@@ -143,8 +143,17 @@ API docs available at `http://localhost:8000/docs`.
 ### 4. Start the analytics worker
 
 ```bash
-python -m analytics.worker
+# Display annotated output in a window (press q to quit)
+python -m analytics.worker --camera cam1
+
+# Headless mode — writes annotated frames to media/snapshots/worker_preview/cam1/
+python -m analytics.worker --camera cam1 --headless
+
+# Override RTSP URL
+python -m analytics.worker --camera cam1 --url rtsp://localhost:8554/cam1
 ```
+
+**Phase-2 performance note (Intel i7-7500U, CPU-only):** sustained ~3–5 FPS per camera at 640 px input width with `yolov8n`.  Adjust `FRAME_DOWNSCALE_WIDTH` and `FPS_THROTTLE` in `.env` to tune.
 
 ### 5. Start the dashboard
 
