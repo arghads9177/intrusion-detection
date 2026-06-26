@@ -1,4 +1,4 @@
-"""Pipeline worker: ingest → detect → classify → zone → temporal → rules → decision.
+"""Pipeline worker: ingest → detect → classify → zone → temporal → rules → event.
 
 Usage:
     python -m analytics.worker --camera cam1
@@ -19,6 +19,7 @@ import numpy as np
 
 from analytics.classifier import ThreatLevel, classify
 from analytics.detector import Detection, Detector
+from analytics.events import EventManager
 from analytics.ingest import FrameIngestor
 from analytics.rules import CameraRules, evaluate, load_rules
 from analytics.zones import ZoneConfig, in_zone, load_zones
@@ -236,6 +237,8 @@ def run(
     tracker = TemporalTracker()
     detector = Detector()
     ingestor = FrameIngestor(camera_id=camera_id, rtsp_url=rtsp_url, fps=FPS_THROTTLE)
+    event_mgr = EventManager(camera_id=camera_id, fps=float(FPS_THROTTLE))
+    zone_id = f"{camera_id}_zone"
 
     fake_now: datetime | None = None
     if fake_hour is not None:
@@ -260,6 +263,9 @@ def run(
             raw_detections = detector.detect(frame_obj.image)
             decisions = process_frame(raw_detections, zone, rules, tracker, fake_now)
 
+            # Feed raw frame to event manager (pre-buffer + active clip writers)
+            event_mgr.feed_frame(frame_obj.image)
+
             frame_count += 1
             if frame_count % 30 == 0:
                 elapsed = time.monotonic() - fps_start
@@ -272,18 +278,22 @@ def run(
                     "[%s] FPS=%.1f  confirmed=%d  suppressed=%d",
                     camera_id, measured_fps, len(confirmed), len(suppressed),
                 )
-                for r in confirmed:
-                    logger.info(
-                        "  CONFIRMED: %s conf=%.2f consecutive=%d",
-                        r.detection.class_name, r.detection.confidence, r.consecutive,
-                    )
-                for r in suppressed:
-                    logger.info(
-                        "  SUPPRESSED: %s reason=%s",
-                        r.detection.class_name, r.reason,
-                    )
 
             annotated = annotate_frame(frame_obj.image, decisions, zone, measured_fps)
+
+            # Dispatch events and suppressed detections
+            for r in decisions:
+                if r.status == DecisionResult.CONFIRMED:
+                    event_mgr.on_confirmed(
+                        detection=r.detection,
+                        zone_id=zone_id,
+                        annotated_frame=annotated,
+                    )
+                elif r.status == DecisionResult.SUPPRESSED:
+                    event_mgr.on_suppressed(
+                        detection=r.detection,
+                        reason=r.reason,
+                    )
 
             if headless and out_dir is not None:
                 cv2.imwrite(str(out_dir / f"{frame_count:06d}.jpg"), annotated)
@@ -295,12 +305,13 @@ def run(
         pass
     finally:
         ingestor.release()
+        event_mgr.close()
         if not headless:
             cv2.destroyAllWindows()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="PIDS detection worker (Phase 3)")
+    parser = argparse.ArgumentParser(description="PIDS detection worker (Phase 4)")
     parser.add_argument("--camera", default="cam1", help="Camera ID")
     parser.add_argument("--url", default=None, help="Override RTSP URL")
     parser.add_argument("--headless", action="store_true")
