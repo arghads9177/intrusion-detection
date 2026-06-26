@@ -1,7 +1,4 @@
-"""Event and alert generation: cooldown, snapshot, clip, and DB persistence.
-
-Phase 4: worker writes directly to MongoDB via backend.db.
-Phase 5: this path will be replaced with POST /events.
+"""Event and alert generation: cooldown, snapshot, clip, and API persistence.
 
 Frame flow
 ----------
@@ -9,9 +6,16 @@ Frame flow
   On a confirmed detection, worker calls event_manager.on_confirmed(annotated_frame).
   Snapshot = annotated frame at moment of event.
   Clip     = pre-buffer raw frames + post-buffer raw frames written by feed_frame.
+
+Events are POSTed to the FastAPI backend (/events) which handles DB writes and
+WebSocket broadcast.  A fallback to direct DB insert is used when the API is
+not reachable (e.g. worker started before the backend).
 """
 
+import json
 import logging
+import urllib.error
+import urllib.request
 import uuid
 from collections import deque
 from datetime import datetime, timedelta, timezone
@@ -191,10 +195,10 @@ class EventManager:
         cooldown_until = now + timedelta(seconds=self._cooldown_seconds)
         self._event_cooldowns[cooldown_key] = cooldown_until
 
-        # --- DB record ---
-        doc: dict[str, Any] = {
+        # --- Persist via API (falls back to direct DB if API is unreachable) ---
+        payload: dict[str, Any] = {
             "camera_id": self.camera_id,
-            "timestamp": now,
+            "timestamp": now.isoformat(),
             "object_class": detection.class_name,
             "confidence": detection.confidence,
             "bbox": list(detection.bbox),
@@ -204,12 +208,10 @@ class EventManager:
             "clip_path": clip_rel,
             "rule_applied": rule_applied,
             "status": "raised",
-            "cooldown_until": cooldown_until,
+            "cooldown_until": cooldown_until.isoformat(),
         }
-        kw: dict[str, Any] = {}
-        if self._db_name_override:
-            kw["db_name"] = self._db_name_override
-        inserted_id = insert_event(doc, **kw)
+
+        inserted_id = self._post_event(payload, now, cooldown_until)
 
         logger.info(
             "EVENT raised  camera=%s  class=%s  conf=%.2f  id=%s  snapshot=%s",
@@ -219,13 +221,47 @@ class EventManager:
             inserted_id,
             snapshot_rel,
         )
-        # Notification stub — will be replaced with real dispatch in a later phase
-        logger.info(
-            "[NOTIFICATION] Alert dispatched  event_id=%s  camera=%s",
-            inserted_id,
-            self.camera_id,
-        )
         return True
+
+    def _post_event(
+        self,
+        payload: dict[str, Any],
+        now: datetime,
+        cooldown_until: datetime,
+    ) -> str:
+        """POST event to the API; fall back to direct DB insert if unreachable."""
+        url = f"{_settings.API_BASE_URL}/events"
+        body = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                data = json.loads(resp.read())
+                return data.get("id", "")
+        except (urllib.error.URLError, Exception) as exc:
+            logger.warning("API POST failed (%s) — falling back to direct DB write", exc)
+            doc: dict[str, Any] = {
+                "camera_id": payload["camera_id"],
+                "timestamp": now,
+                "object_class": payload["object_class"],
+                "confidence": payload["confidence"],
+                "bbox": payload["bbox"],
+                "zone_id": payload["zone_id"],
+                "track_id": payload.get("track_id"),
+                "snapshot_path": payload["snapshot_path"],
+                "clip_path": payload["clip_path"],
+                "rule_applied": payload.get("rule_applied", ""),
+                "status": payload.get("status", "raised"),
+                "cooldown_until": cooldown_until,
+            }
+            kw: dict[str, Any] = {}
+            if self._db_name_override:
+                kw["db_name"] = self._db_name_override
+            return insert_event(doc, **kw)
 
     def on_suppressed(self, detection: Detection, reason: str) -> None:
         """Persist a suppressed detection (once per cooldown window to avoid DB spam)."""

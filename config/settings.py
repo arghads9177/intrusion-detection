@@ -44,3 +44,6 @@ COOLDOWN_SECONDS = int(os.getenv("COOLDOWN_SECONDS", "30"))
 TEMPORAL_CONFIRM_FRAMES = int(os.getenv("TEMPORAL_CONFIRM_FRAMES", "3"))
 
 CAMERAS_CONFIG = BASE_DIR / "config" / "cameras.yaml"
+
+# FastAPI backend base URL used by the worker to POST events
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
