@@ -1,0 +1,230 @@
+<div class="page">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Configuration</h1>
+      <p class="page-sub">Manage detection zones and alert rules per camera</p>
+    </div>
+    @if (saveOk) {
+      <span class="badge badge-success">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Saved
+      </span>
+    }
+    @if (saveErr) {
+      <span class="badge badge-danger">{{ saveErr }}</span>
+    }
+  </div>
+
+  <div class="config-layout">
+    <!-- Camera selector -->
+    <aside class="camera-list card">
+      <p class="section-title" style="padding:0.75rem 0.875rem 0.5rem;margin:0;border-bottom:1px solid #1e3050;">Cameras</p>
+      @for (c of cameras; track c.id) {
+        <button class="cam-btn" [class.cam-btn--active]="c.id === selectedCameraId" (click)="selectCamera(c.id)">
+          <div class="cam-btn-icon">
+            <span [class]="c.enabled ? 'live-dot' : 'live-dot-red'"></span>
+          </div>
+          <div class="cam-btn-info">
+            <span class="cam-btn-name">{{ c.name }}</span>
+            <span class="cam-btn-sub">{{ c.id }}</span>
+          </div>
+          @if (c.id === selectedCameraId) {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          }
+        </button>
+      }
+    </aside>
+
+    <!-- Right panel -->
+    <div class="right-panel">
+      @if (!selectedCameraId) {
+        <div class="card empty-select">
+          <p style="color:#475569;">Select a camera to configure.</p>
+        </div>
+      } @else {
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab-btn" [class.tab-btn--active]="activeTab === 'zone'" (click)="activeTab = 'zone'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+            </svg>
+            Zone Editor
+          </button>
+          <button class="tab-btn" [class.tab-btn--active]="activeTab === 'rules'" (click)="activeTab = 'rules'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Alert Rules
+          </button>
+        </div>
+
+        <!-- Zone editor tab -->
+        @if (activeTab === 'zone') {
+          <div class="card zone-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-title">Zone Polygon Editor</p>
+                <p class="panel-sub">Click on the canvas to place polygon vertices. Green dot = origin point.</p>
+              </div>
+              <div class="panel-header-actions">
+                <button class="btn btn-ghost" style="padding:0.3rem 0.75rem;" (click)="removeLastPoint()">
+                  Undo
+                </button>
+                <button class="btn btn-danger" style="padding:0.3rem 0.75rem;" (click)="clearPolygon()">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <!-- Canvas -->
+            <div class="canvas-wrap">
+              <canvas #zoneCanvas
+                      width="640" height="480"
+                      class="zone-canvas"
+                      (click)="onCanvasClick($event)">
+              </canvas>
+              <div class="canvas-hint">
+                {{ editPolygon.length }} point{{ editPolygon.length !== 1 ? 's' : '' }} placed
+                @if (editPolygon.length < 3) {
+                  · need {{ 3 - editPolygon.length }} more
+                }
+              </div>
+            </div>
+
+            <!-- Zone name + save -->
+            <div class="zone-footer">
+              <div class="form-row">
+                <label class="form-label">Zone Name</label>
+                <input class="input" [(ngModel)]="editZoneName" placeholder="e.g. perimeter" style="max-width:240px;">
+              </div>
+
+              <!-- Point list -->
+              @if (editPolygon.length > 0) {
+                <div class="point-list">
+                  <p class="section-title" style="margin-bottom:0.4rem;">Polygon Points</p>
+                  <div class="point-chips">
+                    @for (pt of editPolygon; track $index) {
+                      <span class="point-chip">
+                        P{{ $index + 1 }}: ({{ pt[0] }}, {{ pt[1] }})
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
+
+              <button class="btn btn-primary" [disabled]="editPolygon.length < 3 || loading" (click)="saveZone()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/>
+                  <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                {{ loading ? 'Saving…' : 'Save Zone' }}
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Rules tab -->
+        @if (activeTab === 'rules') {
+          <div class="card rules-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-title">Alert Rules</p>
+                <p class="panel-sub">Define when and what to alert for camera <strong>{{ selectedCameraId }}</strong></p>
+              </div>
+            </div>
+
+            <div class="rules-form">
+              <!-- Active hours -->
+              <div class="rules-section">
+                <p class="rules-section-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  Active Hours (24h)
+                </p>
+                <div class="hours-row">
+                  <div class="form-field">
+                    <label class="form-label">From</label>
+                    <input type="time" class="input" [(ngModel)]="editRules.active_hours_start">
+                  </div>
+                  <span class="hours-sep">→</span>
+                  <div class="form-field">
+                    <label class="form-label">Until</label>
+                    <input type="time" class="input" [(ngModel)]="editRules.active_hours_end">
+                  </div>
+                </div>
+                <p class="rules-hint">Intrusions outside this window will be suppressed as "out-of-hours".</p>
+              </div>
+
+              <!-- Sensitivity -->
+              <div class="rules-section">
+                <p class="rules-section-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                  </svg>
+                  Confidence Threshold
+                </p>
+                <div class="sensitivity-row">
+                  <input type="range" min="0.1" max="0.9" step="0.05"
+                         [(ngModel)]="editRules.sensitivity">
+                  <div class="sensitivity-labels">
+                    <span class="sens-val" style="color:#3b82f6;">{{ editRules.sensitivity.toFixed(2) }}</span>
+                    <span class="badge"
+                          [class]="editRules.sensitivity >= 0.6 ? 'badge-danger' : editRules.sensitivity >= 0.3 ? 'badge-warning' : 'badge-success'">
+                      {{ sensitivityLabel() }}
+                    </span>
+                  </div>
+                  <p class="rules-hint" style="margin-top:4px;">Detections below this threshold are not reported.</p>
+                </div>
+              </div>
+
+              <!-- Suppressed classes -->
+              <div class="rules-section">
+                <p class="rules-section-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                  </svg>
+                  Suppressed Object Classes
+                </p>
+                <p class="rules-hint" style="margin-bottom:0.75rem;">Checked classes will never generate alerts.</p>
+                <div class="class-checkboxes">
+                  @for (cls of knownClasses; track cls) {
+                    <label class="class-check" (click)="toggleClass(cls)">
+                      <div class="check-box" [class.check-box--on]="suppClassChecked[cls]">
+                        @if (suppClassChecked[cls]) {
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        }
+                      </div>
+                      <span>{{ cls | titlecase }}</span>
+                    </label>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="rules-footer">
+              <button class="btn btn-primary" [disabled]="loading" (click)="saveRules()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/>
+                  <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                {{ loading ? 'Saving…' : 'Save Rules' }}
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</div>

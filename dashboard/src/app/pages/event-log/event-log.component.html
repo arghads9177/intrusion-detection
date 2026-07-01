@@ -1,0 +1,185 @@
+<div class="page">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Event Log</h1>
+      <p class="page-sub">Searchable history of all detection events</p>
+    </div>
+    <span class="badge badge-muted">{{ total }} total events</span>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar card">
+    <div class="filters-grid">
+      <div class="filter-group">
+        <label class="filter-label">Camera</label>
+        <select class="input" [(ngModel)]="filterCamera">
+          <option value="">All cameras</option>
+          @for (c of cameras; track c.id) {
+            <option [value]="c.id">{{ c.name }}</option>
+          }
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Class</label>
+        <select class="input" [(ngModel)]="filterClass">
+          <option value="">All classes</option>
+          @for (cls of classes; track cls) {
+            <option [value]="cls">{{ cls | titlecase }}</option>
+          }
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">From</label>
+        <input type="datetime-local" class="input" [(ngModel)]="filterAfter">
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">To</label>
+        <input type="datetime-local" class="input" [(ngModel)]="filterBefore">
+      </div>
+    </div>
+    <div class="filters-actions">
+      <button class="btn btn-primary" (click)="applyFilters()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Search
+      </button>
+      <button class="btn btn-ghost" (click)="clearFilters()">Clear</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card card">
+    @if (loading) {
+      <div class="loading-rows">
+        @for (_ of [1,2,3,4,5]; track $index) {
+          <div class="skeleton-row">
+            <div class="skeleton" style="width:60px;height:13px;"></div>
+            <div class="skeleton" style="width:120px;height:13px;"></div>
+            <div class="skeleton" style="width:70px;height:13px;"></div>
+            <div class="skeleton" style="width:50px;height:13px;"></div>
+          </div>
+        }
+      </div>
+    } @else if (events.length === 0) {
+      <div class="empty-state">
+        <p style="color:#475569;font-size:0.85rem;">No events match the current filters.</p>
+      </div>
+    } @else {
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Camera</th>
+              <th>Class</th>
+              <th>Confidence</th>
+              <th>Zone</th>
+              <th>Rule</th>
+              <th>Status</th>
+              <th style="width:48px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ev of events; track ev.id) {
+              <tr (click)="openEvent(ev)" style="cursor:pointer;">
+                <td style="font-family:monospace;font-size:0.75rem;color:#94a3b8;">
+                  {{ ev.timestamp | date:'yyyy-MM-dd HH:mm:ss' }}
+                </td>
+                <td>
+                  <span style="font-weight:500;">{{ ev.camera_id }}</span>
+                </td>
+                <td>
+                  <span class="badge badge-danger">{{ ev.object_class | titlecase }}</span>
+                </td>
+                <td>
+                  <div class="conf-bar">
+                    <div class="conf-fill" [style.width]="(ev.confidence * 100) + '%'"></div>
+                    <span class="conf-label">{{ confidence(ev) }}</span>
+                  </div>
+                </td>
+                <td style="color:#94a3b8;">{{ ev.zone_id }}</td>
+                <td style="color:#64748b;font-size:0.75rem;">{{ ev.rule_applied || '—' }}</td>
+                <td>
+                  <span class="badge" [class]="ev.status === 'raised' ? 'badge-danger' : 'badge-muted'">
+                    {{ ev.status }}
+                  </span>
+                </td>
+                <td>
+                  <button class="row-action" (click)="openEvent(ev); $event.stopPropagation()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- Pagination -->
+    <div class="pagination">
+      <span class="pag-info">Page {{ currentPage }} of {{ totalPages }} ({{ total }} events)</span>
+      <div class="pag-btns">
+        <button class="btn btn-ghost" style="padding:0.3rem 0.75rem;" [disabled]="(filters.skip ?? 0) === 0" (click)="prevPage()">
+          ← Prev
+        </button>
+        <button class="btn btn-ghost" style="padding:0.3rem 0.75rem;" [disabled]="currentPage >= totalPages" (click)="nextPage()">
+          Next →
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Event detail modal -->
+@if (selectedEvent) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Event Detail</h2>
+          <p class="modal-sub">{{ selectedEvent.timestamp | date:'MMMM d, y — HH:mm:ss' }}</p>
+        </div>
+        <button class="modal-close" (click)="closeModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Snapshot -->
+        <div class="modal-snap">
+          <img [src]="snapshotUrl(selectedEvent.id)" alt="snapshot" class="snap-img"
+               onerror="this.style.opacity='0.2'">
+        </div>
+
+        <!-- Meta -->
+        <div class="modal-meta-grid">
+          <div class="meta-cell"><span class="mc-label">Camera</span><span class="mc-val">{{ selectedEvent.camera_id }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Class</span><span class="mc-val"><span class="badge badge-danger">{{ selectedEvent.object_class | titlecase }}</span></span></div>
+          <div class="meta-cell"><span class="mc-label">Confidence</span><span class="mc-val">{{ confidence(selectedEvent) }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Zone</span><span class="mc-val">{{ selectedEvent.zone_id }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Track ID</span><span class="mc-val">{{ selectedEvent.track_id ?? '—' }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Status</span><span class="mc-val"><span class="badge" [class]="selectedEvent.status === 'raised' ? 'badge-danger' : 'badge-muted'">{{ selectedEvent.status }}</span></span></div>
+          <div class="meta-cell" style="grid-column:span 2"><span class="mc-label">Rule Applied</span><span class="mc-val">{{ selectedEvent.rule_applied || 'None' }}</span></div>
+          <div class="meta-cell" style="grid-column:span 2"><span class="mc-label">Bounding Box</span><span class="mc-val" style="font-family:monospace;font-size:0.75rem;">[{{ selectedEvent.bbox | json }}]</span></div>
+        </div>
+
+        <!-- Clip -->
+        <div class="modal-clip">
+          <p class="section-title" style="margin-bottom:0.5rem;">Incident Clip</p>
+          <video [src]="clipUrl(selectedEvent.id)" controls class="clip-player"
+                 onerror="this.parentElement.querySelector('.clip-fallback').style.display='block'; this.style.display='none'">
+          </video>
+          <p class="clip-fallback" style="display:none;color:#475569;font-size:0.8rem;margin-top:0.5rem;">Clip not available.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+}

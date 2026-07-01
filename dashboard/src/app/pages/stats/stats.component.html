@@ -1,0 +1,150 @@
+<div class="page">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Statistics</h1>
+      <p class="page-sub">
+        Detection analytics across all cameras
+        @if (lastRefresh) {
+          <span class="refresh-time"> — refreshed {{ lastRefresh | date:'HH:mm:ss' }}</span>
+        }
+      </p>
+    </div>
+    <button class="btn btn-ghost" (click)="refresh()" [disabled]="loading">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+           [style.animation]="loading ? 'spin 1s linear infinite' : 'none'">
+        <polyline points="23 4 23 10 17 10"/>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>
+      {{ loading ? 'Loading…' : 'Refresh' }}
+    </button>
+  </div>
+
+  @if (loading && !stats) {
+    <div class="loading-state">
+      <div class="skeleton" style="height:100px;border-radius:0.75rem;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="skeleton" style="height:280px;border-radius:0.75rem;"></div>
+        <div class="skeleton" style="height:280px;border-radius:0.75rem;"></div>
+      </div>
+    </div>
+  }
+
+  @if (stats) {
+    <!-- KPI cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-card--danger">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Total Intrusions</span>
+          <span class="kpi-value kpi-value--danger">{{ stats.total_intrusions }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-card--primary">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Suppressed</span>
+          <span class="kpi-value kpi-value--primary">{{ stats.total_suppressed }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-card--accent">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+          </svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Cameras</span>
+          <span class="kpi-value kpi-value--accent">{{ stats.per_camera.length }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-card--success">
+        <div class="kpi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Alert Rate</span>
+          <span class="kpi-value kpi-value--success">{{ detectionRate() }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="charts-row">
+      <div class="chart-card card">
+        <p class="chart-title">Detections per Camera</p>
+        <div class="chart-wrap">
+          <canvas baseChart
+                  [data]="barData"
+                  [options]="barOptions"
+                  type="bar">
+          </canvas>
+        </div>
+      </div>
+
+      <div class="chart-card card">
+        <p class="chart-title">Intrusions vs Suppressed</p>
+        <div class="chart-wrap chart-wrap--donut">
+          <canvas baseChart
+                  [data]="donutData"
+                  [options]="donutOptions"
+                  type="doughnut">
+          </canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Per-camera table -->
+    <div class="card" style="overflow:hidden;">
+      <div style="padding:0.875rem 1rem;border-bottom:1px solid #1e3050;">
+        <p class="chart-title" style="margin:0;">Per-Camera Breakdown</p>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Camera ID</th>
+            <th>Intrusions</th>
+            <th>Suppressed</th>
+            <th>Total</th>
+            <th>Alert Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of stats.per_camera; track row.camera_id) {
+            <tr>
+              <td><span style="font-weight:500;">{{ row.camera_id }}</span></td>
+              <td><span class="badge badge-danger">{{ row.intrusions }}</span></td>
+              <td><span class="badge badge-primary">{{ row.suppressed }}</span></td>
+              <td style="color:#94a3b8;">{{ row.intrusions + row.suppressed }}</td>
+              <td>
+                @if (row.intrusions + row.suppressed > 0) {
+                  <div class="rate-bar">
+                    <div class="rate-fill" [style.width]="((row.intrusions / (row.intrusions + row.suppressed)) * 100) + '%'"></div>
+                    <span>{{ ((row.intrusions / (row.intrusions + row.suppressed)) * 100).toFixed(1) }}%</span>
+                  </div>
+                } @else {
+                  <span style="color:#475569;">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

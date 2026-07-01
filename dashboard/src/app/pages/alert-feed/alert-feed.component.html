@@ -1,0 +1,123 @@
+<div class="page">
+  <!-- Page header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Alert Feed</h1>
+      <p class="page-sub">Real-time intrusion alerts — live WebSocket push</p>
+    </div>
+    <div class="header-meta">
+      <span class="badge badge-danger">{{ alerts.length }} alerts</span>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  @if (alerts.length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2a4068" stroke-width="1.5">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+      </div>
+      <p class="empty-title">No alerts yet</p>
+      <p class="empty-sub">Waiting for intrusion events via WebSocket…</p>
+    </div>
+  }
+
+  <!-- Alert cards grid -->
+  <div class="alerts-grid">
+    @for (alert of alerts; track alert.id) {
+      <div class="alert-card" [class.alert-card--new]="alert._new" (click)="openAlert(alert)">
+        <!-- Snapshot thumbnail -->
+        <div class="alert-thumb">
+          <img [src]="snapshotUrl(alert.id)" alt="snapshot"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="thumb-placeholder" style="display:none">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2a4068" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="thumb-badge">
+            <span class="live-dot-red" style="width:5px;height:5px;"></span>
+            ALERT
+          </div>
+        </div>
+
+        <!-- Alert info -->
+        <div class="alert-body">
+          <div class="alert-top">
+            <span class="alert-class">{{ alert.object_class | titlecase }}</span>
+            <span class="badge badge-danger" style="font-size:0.62rem;">{{ confidence(alert) }}</span>
+          </div>
+          <div class="alert-meta">
+            <span class="meta-item">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+              </svg>
+              {{ alert.camera_id }}
+            </span>
+            <span class="meta-item">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              {{ alert.timestamp | date:'HH:mm:ss' }}
+            </span>
+          </div>
+          <div class="alert-footer">
+            <span class="badge badge-muted">Zone: {{ alert.zone_id }}</span>
+            @if (alert.rule_applied) {
+              <span class="badge badge-accent">{{ alert.rule_applied }}</span>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Detail modal -->
+@if (selectedAlert) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Alert Detail</h2>
+          <p class="modal-sub">{{ selectedAlert.timestamp | date:'MMMM d, y — HH:mm:ss' }}</p>
+        </div>
+        <button class="modal-close" (click)="closeModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Snapshot -->
+        <div class="modal-snap">
+          <img [src]="snapshotUrl(selectedAlert.id)" alt="snapshot" class="snap-img"
+               onerror="this.style.opacity='0.3'">
+        </div>
+
+        <!-- Meta grid -->
+        <div class="modal-meta-grid">
+          <div class="meta-cell"><span class="mc-label">Camera</span><span class="mc-val">{{ selectedAlert.camera_id }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Class</span><span class="mc-val">{{ selectedAlert.object_class | titlecase }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Confidence</span><span class="mc-val">{{ confidence(selectedAlert) }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Zone</span><span class="mc-val">{{ selectedAlert.zone_id }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Track ID</span><span class="mc-val">{{ selectedAlert.track_id ?? '—' }}</span></div>
+          <div class="meta-cell"><span class="mc-label">Status</span><span class="mc-val"><span class="badge badge-danger">{{ selectedAlert.status }}</span></span></div>
+          <div class="meta-cell" style="grid-column: span 2"><span class="mc-label">Bounding Box</span><span class="mc-val" style="font-family:monospace;font-size:0.75rem;">[{{ selectedAlert.bbox | json }}]</span></div>
+        </div>
+
+        <!-- Clip -->
+        <div class="modal-clip">
+          <p class="section-title" style="margin-bottom:0.5rem;">Incident Clip</p>
+          <video [src]="clipUrl(selectedAlert.id)" controls class="clip-player"
+                 onerror="this.parentElement.innerHTML='<p style=\'color:#475569;font-size:0.8rem;\'>Clip not available</p>'">
+          </video>
+        </div>
+      </div>
+    </div>
+  </div>
+}
