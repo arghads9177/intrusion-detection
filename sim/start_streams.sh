@@ -63,7 +63,7 @@ if pgrep -x mediamtx &>/dev/null; then
     echo "MediaMTX already running (PID $(pgrep -x mediamtx))."
 else
     echo "Starting MediaMTX on port $RTSP_PORT..."
-    $MEDIAMTX_BIN &>"$SCRIPT_DIR/mediamtx.log" &
+    "$MEDIAMTX_BIN" "$SCRIPT_DIR/mediamtx.yml" &>"$SCRIPT_DIR/mediamtx.log" &
     MTX_PID=$!
     echo "$MTX_PID" > "$PID_DIR/mediamtx.pid"
     sleep 2

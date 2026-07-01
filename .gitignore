@@ -30,6 +30,12 @@ dashboard/dist/
 sim/.pids/
 sim/*.log
 sim/samples/*.mp4
+auto.crt
+auto.key
+
+# Scripts runtime
+scripts/.pids/
+scripts/logs/
 
 # OS
 .DS_Store

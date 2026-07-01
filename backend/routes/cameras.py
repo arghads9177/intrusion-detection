@@ -27,7 +27,11 @@ def _db():
 
 @router.get("/cameras", response_model=list[CameraResponse], tags=["cameras"])
 async def list_cameras(db=Depends(_db)):
-    docs = await db.cameras.find({}).to_list(length=None)
+    # The `cameras` collection is shared with another service (fire/smoke
+    # detection); only select documents that carry our own schema fields.
+    docs = await db.cameras.find(
+        {"cameraId": {"$exists": True}, "rtspUrl": {"$exists": True}}
+    ).to_list(length=None)
     return [
         CameraResponse(
             id=d["cameraId"],
